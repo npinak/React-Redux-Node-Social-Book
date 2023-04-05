@@ -1,12 +1,14 @@
 const asyncHandler = require('express-async-handler')
 
 const Post = require('../models/postModel')
+const User = require('../models/userModel')
 
 //@desc Get Books
 //@route GET /api/posts
 //@access Private 
 const getPosts = asyncHandler(async (req,res) => {
-    const posts = await Post.find()
+    const posts = await Post.find({ user: req.user.id})
+    // const posts = await Post.find() -- maybe keep this to display all posts 
 
     res.status(200).json(posts)
 })
@@ -22,7 +24,8 @@ const setPosts = asyncHandler(async (req, res) => {
 
     }
 const post = await Post.create({
-    text:req.body.text
+    text:req.body.text,
+    user: req.user.id, 
 })
 
     res.status(200).json(post)
@@ -40,7 +43,20 @@ const updatePosts = asyncHandler(async (req, res) => {
         throw new Error('Post not Found')
     }
 
-    console.log(post)
+    const user = await User.findById(req.user.id)
+
+    // Check for user
+    if(!user){
+        res.status(401)
+        throw new Error('User not found')
+    }
+
+    //Make sure the logged in user matches the user in the post json object
+    if(post.user.toString() !== user.id) {
+        res.status(401)
+        throw new Error('User not authorized')
+
+    }
 
     const updatedPost = await Post.findByIdAndUpdate(req.params.id, req.body, {
         new: true,
@@ -54,13 +70,28 @@ const updatePosts = asyncHandler(async (req, res) => {
 //@access Private
 const deletePosts = asyncHandler(async (req, res) => {
 
-    delete_id = {}
+    const user = await User.findById(req.user.id)
+    const post = await Post.findById(req.params.id)
 
-    await Post.deleteOne({ _id: { $eq: req.params.id}}).then(function(){
-        console.log("Data deleted")
-    }).catch(function(error){
-        console.log(error)
-    })
+    
+    if (!user) { // Check for user
+        res.status(401)
+        throw new Error('User not found')
+    } else if (post.user.toString() !== user.id) { //Make sure the logged in user matches the user in the post json object
+        res.status(401)
+        throw new Error('User not authorized')
+    } else {
+        await Post.deleteOne({ _id: { $eq: req.params.id } }).then(function () {
+            console.log("Data deleted")
+        }).catch(function (error) {
+            console.log(error)
+        })
+    }
+
+    
+    
+
+
 
 
     // res.status(200).json({ id: post })
